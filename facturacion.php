@@ -7,14 +7,15 @@ if (!isset($_SESSION['usuario_id'])) {
     header('Location: ./php/login.php');
     exit;
 }
-
+require_once './php/funciones.php';
 require_once './php/config.php';
 
-// Inicializar variables importantes
+// Inicializar variables
 $empresa_seleccionada = null;
 $numero_factura = '';
-$clientes = [];
 $productos = [];
+$mensaje_error = '';
+$mensaje_info = '';
 
 // Obtener empresas del usuario
 try {
@@ -28,52 +29,151 @@ try {
     $stmt_empresas->execute([$_SESSION['usuario_id']]);
     $empresas = $stmt_empresas->fetchAll(PDO::FETCH_ASSOC);
 } catch (PDOException $e) {
-    $_SESSION['error_message'] = "Error al obtener empresas: " . $e->getMessage();
-    header('Location: menu_principal.php');
-    exit;
+    $mensaje_error = "Error al obtener empresas: " . $e->getMessage();
 }
 
-
-// Procesar selección de empresa solo si se envió el formulario
+// Procesar formulario
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['empresa_id'])) {
-    $empresa_id = $_POST['empresa_id'];
+    // Selección de empresa
+    if (isset($_POST['empresa_id'])) {
+        $empresa_id = $_POST['empresa_id'];
+        
+        if ($empresa_id) {
+            foreach ($empresas as $empresa) {
+                if ($empresa['id'] == $empresa_id) {
+                    $empresa_seleccionada = $empresa;
+                    break;
+                }
+            }
+            
+            if ($empresa_seleccionada) {
+                // Generar número de factura
+                $secuencial = $empresa_seleccionada['ultimo_secuencial'] + 1;
+                $numero_factura = sprintf("%03d-%03d-%09d", 
+                    $empresa_seleccionada['codigo_establecimiento'], 
+                    $empresa_seleccionada['codigo_punto_emision'], 
+                    $secuencial);
+       // Obtener productos (primero necesitas esto para calcular totales)
+       try {
+        $sql_productos = "SELECT id, codigo, descripcion, precio, iva, ice, irbpnr 
+                        FROM productos 
+                        WHERE empresa_id = ?";
+        $stmt_productos = $pdo->prepare($sql_productos);
+        $stmt_productos->execute([$empresa_seleccionada['id']]);
+        $productos = $stmt_productos->fetchAll(PDO::FETCH_ASSOC);
+    } catch (PDOException $e) {
+        $mensaje_error = "Error al obtener productos: " . $e->getMessage();
+    }
     
-    if ($empresa_id && $empresa_id !== '') {
-        // Buscar la empresa seleccionada
-        foreach ($empresas as $empresa) {
-            if ($empresa['id'] == $empresa_id) {
-                $empresa_seleccionada = $empresa;
-                break;
+    // --- Aquí procesas los productos seleccionados y calculas totales ---
+    // (Necesitas este cálculo antes de generar la clave)
+    $subtotal0 = 0;
+    $subtotal12 = 0;
+    $iva = 0;
+    
+    // Ejemplo de cálculo (debes adaptarlo a tu formulario):
+    if (isset($_POST['productos'])) {
+        foreach ($_POST['productos'] as $producto) {
+            if ($producto['iva'] == 1) {
+                $subtotal12 += $producto['precio'] * $producto['cantidad'];
+                $iva += $producto['precio'] * $producto['cantidad'] * 0.12;
+            } else {
+                $subtotal0 += $producto['precio'] * $producto['cantidad'];
             }
         }
-        
-        if (!$empresa_seleccionada) {
-            $_SESSION['error_message'] = 'Empresa no encontrada';
-        } else {
-            // Generar número de factura solo si se encontró la empresa
-            $secuencial = $empresa_seleccionada['ultimo_secuencial'] + 1;
-            $numero_factura = sprintf("%03d-%03d-%09d", 
-                $empresa_seleccionada['codigo_establecimiento'], 
-                $empresa_seleccionada['codigo_punto_emision'], 
-                $secuencial);
-            
-            // Obtener clientes y productos solo si hay empresa seleccionada
-            try {
-                // Obtener clientes
-                $sql_clientes = "SELECT * FROM clientes WHERE empresa_id = ?";
-                $stmt_clientes = $pdo->prepare($sql_clientes);
-                $stmt_clientes->execute([$empresa_seleccionada['id']]);
-                $clientes = $stmt_clientes->fetchAll(PDO::FETCH_ASSOC);
+    }
+                $total = $subtotal0 + $subtotal12 + $iva;
+                
+                // --- AHORA generas la clave de acceso ---
+                $claveAcceso = generarClaveAcceso($empresa_seleccionada);
+                
+                // --- FINALMENTE guardas en la base de datos ---
+                try {
+                    $sql = "INSERT INTO facturas (
+                        empresa_id, cliente_id, numero_factura, fecha_emision, 
+                        tipo_comprobante, subtotal_0, subtotal_12, iva, total,
+                        clave_acceso, estado, usuario_id
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDIENTE', ?)";
+                    
+                    $stmt = $pdo->prepare($sql);
+                    $stmt->execute([
+                        $empresa_seleccionada['id'],
+                        $_POST['comprador_id'],
+                        $numero_factura,
+                        $_POST['fecha_emision'],
+                        $_POST['tipo_comprobante'],
+                        $subtotal0,
+                        $subtotal12,
+                        $iva,
+                        $total,
+                        $claveAcceso,
+                        $_SESSION['usuario_id']
+                    ]);
+                    
+                    $factura_id = $pdo->lastInsertId();
+                    
+                    // Guardar detalles de productos (ejemplo)
+                    foreach ($_POST['productos'] as $producto) {
+                        $sql_detalle = "INSERT INTO factura_detalles (...) VALUES (...)";
+                        // ... ejecutar consulta para cada producto
+                    }
+                    
+                    $_SESSION['mensaje_exito'] = "Factura creada. Clave: $claveAcceso";
+                    header('Location: ver_factura.php?id=' . $factura_id);
+                    exit;
+                    
+                } catch (PDOException $e) {
+                    $mensaje_error = "Error al guardar: " . $e->getMessage();
+                }
+                
+            } else {
+                $mensaje_error = 'Empresa no encontrada';
+            }
+            }
+            }
 
-// Obtener productos
-$sql_productos = "SELECT id, codigo, descripcion, precio, iva, ice, irbpnr 
-                 FROM productos 
-                 WHERE empresa_id = ?";
-$stmt_productos = $pdo->prepare($sql_productos);
-$stmt_productos->execute([$empresa_seleccionada['id']]);
-$productos = $stmt_productos->fetchAll(PDO::FETCH_ASSOC);
+
+    
+    // Búsqueda de cliente
+    if (isset($_POST['buscar_cliente']) && $empresa_seleccionada) {
+        $tipo_identificacion = $_POST['comprador_tipo'] ?? '';
+        $identificacion = $_POST['comprador_identificacion'] ?? '';
+        
+        if (empty($identificacion)) {
+            $mensaje_error = 'Por favor ingrese un número de identificación';
+        } else {
+            try {
+                $sql = "SELECT * FROM clientes 
+                       WHERE empresa_id = ? 
+                       AND tipo_identificacion = ? 
+                       AND identificacion = ?";
+                $stmt = $pdo->prepare($sql);
+                $stmt->execute([
+                    $empresa_seleccionada['id'],
+                    $tipo_identificacion,
+                    $identificacion
+                ]);
+                
+                $cliente = $stmt->fetch(PDO::FETCH_ASSOC);
+                
+                if ($cliente) {
+                    $_POST['comprador_nombre'] = $cliente['nombre'];
+                    $_POST['comprador_direccion'] = $cliente['direccion'];
+                    $_POST['comprador_telefono'] = $cliente['telefono'];
+                    $_POST['comprador_email'] = $cliente['email'];
+                    $_POST['comprador_id'] = $cliente['id'];
+                } else {
+                    $_SESSION['cliente_temporal'] = [
+                        'tipo' => $tipo_identificacion,
+                        'identificacion' => $identificacion
+                    ];
+                    $mensaje_info = 'Cliente no encontrado. <a href="nuevo_cliente.php?empresa_id='.$empresa_seleccionada['id'].'&tipo='.$tipo_identificacion.'&identificacion='.$identificacion.'">¿Desea crear uno nuevo?</a>';
+                    unset($_POST['comprador_nombre'], $_POST['comprador_direccion'], 
+                          $_POST['comprador_telefono'], $_POST['comprador_email'], 
+                          $_POST['comprador_id']);
+                }
             } catch (PDOException $e) {
-                $_SESSION['error_message'] = "Error al obtener datos: " . $e->getMessage();
+                $mensaje_error = "Error al buscar cliente: " . $e->getMessage();
             }
         }
     }
@@ -87,6 +187,7 @@ $productos = $stmt_productos->fetchAll(PDO::FETCH_ASSOC);
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sistema de Facturación</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
         body { 
             font-family: Arial, sans-serif; 
@@ -304,16 +405,56 @@ input[readonly] {
     border: 1px solid #ddd;
     cursor: not-allowed;
 }
+        .alert {
+            padding: 10px;
+            margin-bottom: 15px;
+            border-radius: 4px;
+        }
+        .alert-danger {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .alert-info {
+            background-color: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        .alert-success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .empresa-info p strong {
+    color: #333;
+    font-weight: bold;
+    display: inline-block;
+    width: 120px; /* Para alinear los textos */
+}
+
+.empresa-info {
+    background: #f8f9fa;
+    padding: 15px;
+    border-radius: 5px;
+    margin-bottom: 20px;
+}
     </style>
 </head>
 <body>
     <div class="container">
         <h1>Sistema de Facturación</h1>
         
+        <?php if ($mensaje_error): ?>
+            <div class="alert alert-danger"><?= $mensaje_error ?></div>
+        <?php endif; ?>
+        
+        <?php if ($mensaje_info): ?>
+            <div class="alert alert-info"><?= $mensaje_info ?></div>
+        <?php endif; ?>
+        
         <!-- Selector de empresa -->
         <div class="empresa-selector">
-            
-            <form method="POST" action="<?php echo htmlspecialchars($_SERVER['PHP_SELF']); ?>">
+            <form method="POST">
                 <label for="empresa_id">Seleccione una empresa:</label>
                 <select id="empresa_id" name="empresa_id" required>
                     <option value="">-- Seleccione --</option>
@@ -325,23 +466,27 @@ input[readonly] {
                         </option>
                     <?php endforeach; ?>
                 </select>
-                <button type="submit" name="submit_form" class="btn">Seleccionar</button>
+                <button type="submit" class="btn">Seleccionar</button>
             </form>
         </div>
         
-        <?php if (isset($empresa_seleccionada) && $empresa_seleccionada): ?>
-            <!-- Mostrar el formulario de facturación solo cuando hay empresa seleccionada -->
+        <?php if ($empresa_seleccionada): ?>
+            <!-- Datos de la empresa -->
             <div class="empresa-info">
                 <h2><?= htmlspecialchars($empresa_seleccionada['razon_social']) ?></h2>
                 <p>RUC: <?= htmlspecialchars($empresa_seleccionada['ruc']) ?></p>
                 <p>N° Factura: <?= $numero_factura ?></p>
+                    <!-- Nueva línea para mostrar la clave de acceso -->
+    <?php if (!empty($claveAcceso)): ?>
+        <p><strong>Clave de Acceso:</strong> <?= $claveAcceso ?></p>
+    <?php endif; ?>
             </div>
             
             <!-- Formulario de facturación -->
-            <form method="POST" action="facturacion.php" id="facturaForm">
+            <form method="POST" id="facturaForm">
                 <input type="hidden" name="empresa_id" value="<?= $empresa_seleccionada['id'] ?>">
                 
-                <!-- Campos del cliente -->
+                <!-- Sección de datos del comprador -->
                 <div class="datos-comprador">
     <h3>Datos del comprador</h3>
     
@@ -349,11 +494,20 @@ input[readonly] {
         <label for="comprador_tipo">Tipo de Comprador:</label>
         <div class="comprador-tipo-container">
             <select id="comprador_tipo" name="comprador_tipo" class="tipo-comprador" required>
-                <option value="07">CONSUMIDOR FINAL</option>
-                <option value="04">RUC</option>
-                <option value="05">CÉDULA</option>
-                <option value="06">PASAPORTE</option>
-                <option value="08">IDENTIFICACIÓN DEL EXTERIOR</option>
+                <?php 
+                $tipos = [
+                    '04' => 'RUC',
+                    '05' => 'CÉDULA',
+                    '06' => 'PASAPORTE', 
+                    '07' => 'CONSUMIDOR FINAL',
+                    '08' => 'IDENTIFICACIÓN DEL EXTERIOR'
+                ];
+                foreach ($tipos as $valor => $texto): ?>
+                    <option value="<?= $valor ?>" 
+                        <?= (isset($_POST['comprador_tipo']) && $_POST['comprador_tipo'] == $valor) ? 'selected' : '' ?>>
+                        <?= $texto ?>
+                    </option>
+                <?php endforeach; ?>
             </select>
             <div class="comprador-warning">
                 <small>Recuerde que a partir de $200 no se puede emitir una factura como Consumidor Final</small>
@@ -364,52 +518,68 @@ input[readonly] {
     <div class="form-group">
         <label for="comprador_identificacion">Identificación:</label>
         <div class="busqueda-container">
-            <input type="text" id="comprador_identificacion" name="comprador_identificacion" placeholder="Buscar...">
-            <button type="button" class="btn btn-small" onclick="buscarCliente()">
+            <input type="text" id="comprador_identificacion" name="comprador_identificacion" 
+                   value="<?= isset($_POST['comprador_identificacion']) ? htmlspecialchars($_POST['comprador_identificacion']) : '' ?>" 
+                   placeholder="Buscar..." required>
+            <button type="submit" name="buscar_cliente" class="btn btn-small">
                 <i class="fas fa-search"></i> Buscar
             </button>
-            <a href="buscar_cliente.php?empresa_id=<?= $empresa_seleccionada['id'] ?? '' ?>" class="btn btn-small btn-secondary">
+            <a href="nuevo_cliente.php?empresa_id=<?= $empresa_seleccionada['id'] ?>" class="btn btn-small btn-secondary">
                 <i class="fas fa-plus"></i>
             </a>
+            <?php if (isset($_POST['comprador_id']) && $_POST['comprador_id']): ?>
+                <a href="eliminar_cliente.php?id=<?= $_POST['comprador_id'] ?>&empresa_id=<?= $empresa_seleccionada['id'] ?>" 
+                   class="btn btn-small btn-danger" onclick="return confirm('¿Está seguro de eliminar este cliente?');">
+                    <i class="fas fa-trash"></i>
+                </a>
+            <?php endif; ?>
         </div>
     </div>
 
     <div class="form-group">
-    <label for="comprador_nombre">RAZÓN SOCIAL/APELLIDOS Y NOMBRES:</label>
-    <input type="text" id="comprador_nombre" name="comprador_nombre" readonly>
+        <label for="comprador_nombre">RAZÓN SOCIAL/APELLIDOS Y NOMBRES:</label>
+        <input type="text" id="comprador_nombre" name="comprador_nombre" 
+               value="<?= isset($_POST['comprador_nombre']) ? htmlspecialchars($_POST['comprador_nombre']) : '' ?>" readonly>
+    </div>
+
+    <div class="form-group">
+        <label for="comprador_direccion">DIRECCIÓN COMPRADOR:</label>
+        <input type="text" id="comprador_direccion" name="comprador_direccion" 
+               value="<?= isset($_POST['comprador_direccion']) ? htmlspecialchars($_POST['comprador_direccion']) : '' ?>" readonly>
+    </div>
+
+    <div class="form-group">
+        <label for="comprador_telefono">Teléfono:</label>
+        <input type="text" id="comprador_telefono" name="comprador_telefono" 
+               value="<?= isset($_POST['comprador_telefono']) ? htmlspecialchars($_POST['comprador_telefono']) : '' ?>" readonly>
+    </div>
+
+    <div class="form-group">
+        <label for="comprador_email">Email:</label>
+        <input type="email" id="comprador_email" name="comprador_email" 
+               value="<?= isset($_POST['comprador_email']) ? htmlspecialchars($_POST['comprador_email']) : '' ?>" readonly>
+    </div>
+    
+    <input type="hidden" id="comprador_id" name="comprador_id" 
+           value="<?= isset($_POST['comprador_id']) ? htmlspecialchars($_POST['comprador_id']) : '' ?>">
+</div>
+
+<!-- Resto del formulario (fecha, tipo de comprobante, etc.) -->
+<div class="form-group">
+    <label for="fecha_emision">Fecha de Emisión:</label>
+    <input type="date" id="fecha_emision" name="fecha_emision" required value="<?= date('Y-m-d') ?>">
 </div>
 
 <div class="form-group">
-    <label for="comprador_direccion">DIRECCIÓN COMPRADOR:</label>
-    <input type="text" id="comprador_direccion" name="comprador_direccion" readonly>
+    <label for="tipo_comprobante">Tipo de Comprobante:</label>
+    <select id="tipo_comprobante" name="tipo_comprobante" required>
+        <option value="01">Factura</option>
+        <option value="04">Nota de Crédito</option>
+        <option value="05">Nota de Débito</option>
+        <option value="06">Guía de Remisión</option>
+        <option value="07">Comprobante de Retención</option>
+    </select>
 </div>
-
-<div class="form-group">
-    <label for="comprador_telefono">Teléfono:</label>
-    <input type="text" id="comprador_telefono" name="comprador_telefono" readonly>
-</div>
-
-<div class="form-group">
-    <label for="comprador_email">Email:</label>
-    <input type="email" id="comprador_email" name="comprador_email" readonly>
-</div>
-
-
-                <div class="form-group">
-                    <label for="fecha_emision">Fecha de Emisión:</label>
-                    <input type="date" id="fecha_emision" name="fecha_emision" required value="<?= date('Y-m-d') ?>">
-                </div>
-
-                <div class="form-group">
-                    <label for="tipo_comprobante">Tipo de Comprobante:</label>
-                    <select id="tipo_comprobante" name="tipo_comprobante" required>
-                        <option value="01">Factura</option>
-                        <option value="04">Nota de Crédito</option>
-                        <option value="05">Nota de Débito</option>
-                        <option value="06">Guía de Remisión</option>
-                        <option value="07">Comprobante de Retención</option>
-                    </select>
-                </div>
 
                 <h3>Detalle de la Factura</h3>
 
@@ -539,12 +709,11 @@ input[readonly] {
                         </tbody>
                     </table>
                     <button type="button" onclick="document.getElementById('productModal').style.display = 'none'" class="btn btn-danger" style="margin-top: 15px;">Cancelar</button>
-                </div>
-            </div>
+                    </div>
         <?php endif; ?>
     </div>
-
-    <script>
+</div>
+<script>
 // Variables globales
 let productos = <?= json_encode($productos, JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
 let items = [];
@@ -567,23 +736,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    const facturaForm = document.getElementById('facturaForm');
-    if (facturaForm) {
-        facturaForm.addEventListener('submit', function(e) {
-            if (items.length === 0) {
-                e.preventDefault();
-                alert('Debe agregar al menos un producto a la factura');
-                return false;
-            }
-            
-            const clienteSelect = document.getElementById('cliente_id');
-            if (!clienteSelect || clienteSelect.value === '') {
-                e.preventDefault();
-                alert('Debe seleccionar un cliente');
-                return false;
-            }
-        });
-    }
+
     
     // Configurar botón de cerrar modal si existe
     const closeModalBtn = document.querySelector('#productModal .btn-danger');
