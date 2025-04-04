@@ -5,10 +5,10 @@
 // CONFIGURACIÓN BÁSICA DE LA BASE DE DATOS
 // =============================================
 define('DB_HOST', '127.0.0.1'); // O la IP de tu servidor MySQL
-define('DB_USER', 'Jerem'); // Usuario de MySQL Workbench
-define('DB_PASS', '2585'); // Contraseña del usuario
+define('DB_USER', 'root'); // Usuario de MySQL Workbench
+define('DB_PASS', '12345'); // Contraseña del usuario
 define('DB_NAME', 'sistema_facturacion'); // Nombre de tu base de datos
-define('DB_PORT', 3306); // Puerto de MySQL (por defecto 3306)
+define('DB_PORT', 3310); // Puerto de MySQL (por defecto 3306)
 
 // =============================================
 // CONFIGURACIÓN PARA TCPDF (GENERACIÓN DE PDF)
@@ -117,3 +117,4 @@ function iniciarSesionSegura() {
 define('MAX_FILE_SIZE', 5 * 1024 * 1024); // 5MB máximo para uploads
 define('SESSION_TIMEOUT', 1800); // 30 minutos de inactividad
 define('ENVIRONMENT', 'development'); // 'production' en entorno real
+

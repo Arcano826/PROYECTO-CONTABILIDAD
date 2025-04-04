@@ -38,92 +38,9 @@ if (isset($_GET['id'])) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="./css/style_ver_empres.css">
     <title>Detalles de Empresa</title>
-    <style>
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            margin: 0;
-            padding: 20px;
-            background-color: #f5f5f5;
-        }
-        .container {
-            max-width: 800px;
-            margin: 0 auto;
-            background: white;
-            padding: 30px;
-            border-radius: 8px;
-            box-shadow: 0 0 10px rgba(0,0,0,0.1);
-        }
-        h1 {
-            color: #2c3e50;
-            margin-bottom: 20px;
-        }
-        .empresa-details {
-            margin-bottom: 30px;
-        }
-        .detail-row {
-            display: flex;
-            margin-bottom: 15px;
-            border-bottom: 1px solid #eee;
-            padding-bottom: 15px;
-        }
-        .detail-label {
-            font-weight: bold;
-            width: 200px;
-            color: #555;
-        }
-        .detail-value {
-            flex: 1;
-        }
-        .logo-preview {
-            max-width: 200px;
-            max-height: 200px;
-            margin-top: 10px;
-        }
-        .btn {
-            display: inline-block;
-            padding: 10px 20px;
-            text-decoration: none;
-            border-radius: 4px;
-            font-weight: bold;
-            transition: all 0.3s;
-            margin-right: 10px;
-        }
-        .btn-primary {
-            background-color: #3498db;
-            color: white;
-        }
-        .btn-primary:hover {
-            background-color: #2980b9;
-        }
-        .btn-danger {
-            background-color: #e74c3c;
-            color: white;
-        }
-        .btn-danger:hover {
-            background-color: #c0392b;
-        }
-        .btn-success {
-            background-color: #2ecc71;
-            color: white;
-        }
-        .btn-success:hover {
-            background-color: #27ae60;
-        }
-        .back-btn {
-            margin-bottom: 20px;
-            display: inline-block;
-        }
-        .alert {
-            padding: 15px;
-            margin-bottom: 20px;
-            border-radius: 4px;
-        }
-        .alert-error {
-            background-color: #ffdddd;
-            color: #cc0000;
-        }
-    </style>
+    
 </head>
 <body>
     <div class="container">

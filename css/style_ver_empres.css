@@ -1,0 +1,200 @@
+:root {
+    --title-color: #2c3e50;    /* Azul marino para títulos */
+    --text-color: #000000;     /* Negro para texto normal */
+    --primary-color: #3498db;  /* Celeste para botones */
+    --primary-dark: #2980b9;   /* Celeste oscuro */
+    --accent-color: #e74c3c;   /* Rojo para acentos */
+    --success-color: #2ecc71;  /* Verde */
+    --light-gray: #f5f5f5;     /* Fondo gris claro */
+    --border-color: #d1d5db;   /* Color para bordes */
+    --shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    --transition: all 0.3s ease;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    margin: 0;
+    padding: 0;
+    background: url('../images/fondo_imagen.jpeg') no-repeat center center fixed;
+    background-size: cover;
+    color: var(--text-color);
+    line-height: 1.5;
+    min-height: 100vh;
+}
+
+.container {
+    max-width: 850px;
+    margin: 0 auto;
+    background: white;
+    padding: 30px;
+    border-radius: 10px;
+    box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);
+}
+
+h1 {
+    color: var(--title-color);
+    margin-bottom: 25px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid var(--border-color);
+}
+
+/* Estilo para cada fila de detalle */
+.detail-row {
+    display: flex;
+    margin-bottom: 15px;
+    padding: 15px;
+    background-color: white;
+    border-radius: 8px;
+    box-shadow: var(--shadow);
+    border: 1px solid var(--border-color);
+    transition: var(--transition);
+    position: relative;
+}
+
+/* Efecto relieve */
+.detail-row::after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    right: 2px;
+    height: 30%;
+    background: linear-gradient(to bottom, rgba(255,255,255,0.3), rgba(255,255,255,0));
+    border-radius: 6px 6px 0 0;
+    pointer-events: none;
+}
+
+.detail-row:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.detail-label {
+    font-weight: 600;
+    width: 220px;
+    color: var(--title-color);
+    padding-right: 15px;
+    font-size: 0.95rem;
+}
+
+.detail-value {
+    flex: 1;
+    color: var(--text-color);
+    font-size: 0.95rem;
+    padding-left: 15px;
+    border-left: 1px dashed var(--border-color);
+}
+
+/* Logo */
+.logo-preview {
+    max-width: 200px;
+    max-height: 200px;
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+    box-shadow: var(--shadow);
+    transition: var(--transition);
+}
+
+.logo-preview:hover {
+    transform: scale(1.03);
+}
+
+/* Botones */
+.btn {
+    display: inline-block;
+    padding: 10px 20px;
+    text-decoration: none;
+    border-radius: 6px;
+    font-weight: 600;
+    transition: var(--transition);
+    margin-right: 10px;
+    border: none;
+    cursor: pointer;
+    font-size: 0.95rem;
+}
+
+.btn-primary {
+    background-color: var(--primary-color);
+    color: white;
+}
+
+.btn-primary:hover {
+    background-color: var(--primary-dark);
+    transform: translateY(-2px);
+}
+
+.btn-danger {
+    background-color: var(--accent-color);
+    color: white;
+}
+
+.btn-danger:hover {
+    background-color: #c0392b;
+    transform: translateY(-2px);
+}
+
+.btn-success {
+    background-color: var(--success-color);
+    color: white;
+}
+
+.btn-success:hover {
+    background-color: #27ae60;
+    transform: translateY(-2px);
+}
+
+.back-btn {
+    margin-bottom: 25px;
+}
+
+/* Alertas */
+.alert {
+    padding: 15px;
+    margin-bottom: 25px;
+    border-radius: 6px;
+    border-left: 4px solid;
+}
+
+.alert-error {
+    background-color: rgba(231, 76, 60, 0.1);
+    border-left-color: var(--accent-color);
+    color: var(--accent-color);
+}
+
+/* Grupo de botones */
+.action-buttons {
+    margin-top: 30px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border-color);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .container {
+        padding: 20px;
+    }
+    
+    .detail-row {
+        flex-direction: column;
+    }
+    
+    .detail-label {
+        width: 100%;
+        padding-right: 0;
+        margin-bottom: 8px;
+    }
+    
+    .detail-value {
+        padding-left: 0;
+        border-left: none;
+        border-top: 1px dashed var(--border-color);
+        padding-top: 8px;
+    }
+    
+    .btn {
+        display: block;
+        width: 100%;
+        margin-bottom: 10px;
+        text-align: center;
+    }
+}
