@@ -7,7 +7,7 @@ if (!isset($_SESSION['usuario_id'])) {
     header('Location: ./php/login.php');
     exit;
 }
-require_once './php/funciones.php';
+
 require_once './php/config.php';
 
 // Inicializar variables
@@ -33,12 +33,13 @@ try {
 }
 
 // Procesar formulario
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['empresa_id'])) {
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Selección de empresa
     if (isset($_POST['empresa_id'])) {
         $empresa_id = $_POST['empresa_id'];
         
         if ($empresa_id) {
+            // Buscar la empresa seleccionada
             foreach ($empresas as $empresa) {
                 if ($empresa['id'] == $empresa_id) {
                     $empresa_seleccionada = $empresa;
@@ -46,93 +47,204 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['empresa_id'])) {
                 }
             }
             
-            if ($empresa_seleccionada) {
-                // Generar número de factura
-                $secuencial = $empresa_seleccionada['ultimo_secuencial'] + 1;
-                $numero_factura = sprintf("%03d-%03d-%09d", 
-                    $empresa_seleccionada['codigo_establecimiento'], 
-                    $empresa_seleccionada['codigo_punto_emision'], 
-                    $secuencial);
-       // Obtener productos (primero necesitas esto para calcular totales)
-       try {
-        $sql_productos = "SELECT id, codigo, descripcion, precio, iva, ice, irbpnr 
-                        FROM productos 
-                        WHERE empresa_id = ?";
-        $stmt_productos = $pdo->prepare($sql_productos);
-        $stmt_productos->execute([$empresa_seleccionada['id']]);
-        $productos = $stmt_productos->fetchAll(PDO::FETCH_ASSOC);
-    } catch (PDOException $e) {
-        $mensaje_error = "Error al obtener productos: " . $e->getMessage();
-    }
-    
-    // --- Aquí procesas los productos seleccionados y calculas totales ---
-    // (Necesitas este cálculo antes de generar la clave)
-    $subtotal0 = 0;
-    $subtotal12 = 0;
-    $iva = 0;
-    
-    // Ejemplo de cálculo (debes adaptarlo a tu formulario):
-    if (isset($_POST['productos'])) {
-        foreach ($_POST['productos'] as $producto) {
-            if ($producto['iva'] == 1) {
-                $subtotal12 += $producto['precio'] * $producto['cantidad'];
-                $iva += $producto['precio'] * $producto['cantidad'] * 0.12;
+            if (!$empresa_seleccionada) {
+                $mensaje_error = 'Empresa no encontrada';
+                // Continuar con el flujo normal para mostrar el error
             } else {
-                $subtotal0 += $producto['precio'] * $producto['cantidad'];
-            }
-        }
-    }
-                $total = $subtotal0 + $subtotal12 + $iva;
-                
-                // --- AHORA generas la clave de acceso ---
-                $claveAcceso = generarClaveAcceso($empresa_seleccionada);
-                
-                // --- FINALMENTE guardas en la base de datos ---
+                // Procesamiento de productos (manteniendo tu lógica original)
                 try {
-                    $sql = "INSERT INTO facturas (
-                        empresa_id, cliente_id, numero_factura, fecha_emision, 
-                        tipo_comprobante, subtotal_0, subtotal_12, iva, total,
-                        clave_acceso, estado, usuario_id
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDIENTE', ?)";
-                    
-                    $stmt = $pdo->prepare($sql);
-                    $stmt->execute([
-                        $empresa_seleccionada['id'],
-                        $_POST['comprador_id'],
-                        $numero_factura,
-                        $_POST['fecha_emision'],
-                        $_POST['tipo_comprobante'],
-                        $subtotal0,
-                        $subtotal12,
-                        $iva,
-                        $total,
-                        $claveAcceso,
-                        $_SESSION['usuario_id']
-                    ]);
-                    
-                    $factura_id = $pdo->lastInsertId();
-                    
-                    // Guardar detalles de productos (ejemplo)
-                    foreach ($_POST['productos'] as $producto) {
-                        $sql_detalle = "INSERT INTO factura_detalles (...) VALUES (...)";
-                        // ... ejecutar consulta para cada producto
-                    }
-                    
-                    $_SESSION['mensaje_exito'] = "Factura creada. Clave: $claveAcceso";
-                    header('Location: ver_factura.php?id=' . $factura_id);
-                    exit;
-                    
+                    $sql_productos = "SELECT id, codigo, descripcion, precio, iva, ice, irbpnr 
+                                    FROM productos 
+                                    WHERE empresa_id = ?";
+                    $stmt_productos = $pdo->prepare($sql_productos);
+                    $stmt_productos->execute([$empresa_seleccionada['id']]);
+                    $productos = $stmt_productos->fetchAll(PDO::FETCH_ASSOC);
                 } catch (PDOException $e) {
-                    $mensaje_error = "Error al guardar: " . $e->getMessage();
+                    $mensaje_error = "Error al obtener productos: " . $e->getMessage();
                 }
+
+                // Verificar si es una solicitud de generación de factura
+                if (isset($_POST['generar_factura'])) {
+                    try {
+                        // Validación básica de campos requeridos
+                        if (empty($_POST['fecha_emision']) || empty($_POST['tipo_comprobante'])) {
+                            throw new Exception("Faltan campos requeridos para generar la factura");
+                        }
+
+                        // Obtener el secuencial actualizado
+                        $secuencial = $empresa_seleccionada['ultimo_secuencial'] + 1;
+                        $numero_factura = sprintf("%03d-%03d-%09d", 
+                            $empresa_seleccionada['codigo_establecimiento'], 
+                            $empresa_seleccionada['codigo_punto_emision'], 
+                            $secuencial);
+                        
+                        // Generar clave de acceso inicial
+                        $clave_acceso = generarClaveAcceso(
+                            date('Y-m-d'),
+                            '01', // Tipo comprobante por defecto (Factura)
+                            $empresa_seleccionada['ruc'],
+                            $empresa_seleccionada['tipo_ambiente'] == 'PRODUCCION' ? '2' : '1',
+                            $empresa_seleccionada['codigo_establecimiento'] . $empresa_seleccionada['codigo_punto_emision'],
+                            $secuencial
+                        );
                 
+                        // Iniciar transacción
+                        $pdo->beginTransaction();
+                        
+                        // Insertar la factura
+                        $sql = "INSERT INTO facturas (
+                            empresa_id, 
+                            cliente_id, 
+                            numero_factura, 
+                            fecha_emision, 
+                            tipo_comprobante, 
+                            subtotal_0, 
+                            subtotal_12, 
+                            iva, 
+                            total, 
+                            clave_acceso,
+                            estado,
+                            moneda,
+                            guia_remision,
+                            usuario_id
+                        ) VALUES (
+                            :empresa_id, 
+                            :cliente_id, 
+                            :numero_factura, 
+                            :fecha_emision, 
+                            :tipo_comprobante, 
+                            :subtotal_0, 
+                            :subtotal_12, 
+                            :iva, 
+                            :total, 
+                            :clave_acceso,
+                            'PENDIENTE',
+                            :moneda,
+                            :guia_remision,
+                            :usuario_id
+                        )";
+                        
+                        $stmt = $pdo->prepare($sql);
+                        
+                        // Calcular totales
+                        $subtotal_0 = calcularSubtotal0($_POST['items'] ?? []);
+                        $subtotal_12 = calcularSubtotal12($_POST['items'] ?? []);
+                        $iva = calcularIVA($_POST['items'] ?? []);
+                        $total = $subtotal_0 + $subtotal_12 + $iva;
+                        
+                        $stmt->execute([
+                            ':empresa_id' => $empresa_seleccionada['id'],
+                            ':cliente_id' => $_POST['comprador_id'] ?? null,
+                            ':numero_factura' => $numero_factura,
+                            ':fecha_emision' => $_POST['fecha_emision'],
+                            ':tipo_comprobante' => $_POST['tipo_comprobante'],
+                            ':subtotal_0' => $subtotal_0,
+                            ':subtotal_12' => $subtotal_12,
+                            ':iva' => $iva,
+                            ':total' => $total,
+                            ':clave_acceso' => $clave_acceso,
+                            ':moneda' => $_POST['moneda'] ?? 'USD',
+                            ':guia_remision' => $_POST['guia_remision'] ?? null,
+                            ':usuario_id' => $_SESSION['usuario_id']
+                        ]);
+                        
+                        $factura_id = $pdo->lastInsertId();
+                        
+                        // Insertar detalles de la factura
+                        if (!empty($_POST['items'])) {
+                            foreach ($_POST['items'] as $item) {
+                                $sql = "INSERT INTO factura_detalles (
+                                    factura_id, 
+                                    producto_id, 
+                                    codigo, 
+                                    descripcion, 
+                                    cantidad, 
+                                    precio_unitario, 
+                                    desuento, 
+                                    subtotal, 
+                                    iva, 
+                                    ice, 
+                                    irbpnr
+                                ) VALUES (
+                                    :factura_id, 
+                                    :producto_id, 
+                                    :codigo, 
+                                    :descripcion, 
+                                    :cantidad, 
+                                    :precio_unitario, 
+                                    :descuento, 
+                                    :subtotal, 
+                                    :iva, 
+                                    :ice, 
+                                    :irbpnr
+                                )";
+                                
+                                $stmt = $pdo->prepare($sql);
+                                
+                                $subtotal = $item['cantidad'] * $item['precio'] * (1 - ($item['descuento'] / 100));
+                                $iva_item = $item['iva'] ? $subtotal * 0.12 : 0;
+                                
+                                $stmt->execute([
+                                    ':factura_id' => $factura_id,
+                                    ':producto_id' => $item['producto_id'],
+                                    ':codigo' => $item['codigo'],
+                                    ':descripcion' => $item['descripcion'],
+                                    ':cantidad' => $item['cantidad'],
+                                    ':precio_unitario' => $item['precio'],
+                                    ':descuento' => $item['descuento'],
+                                    ':subtotal' => $subtotal,
+                                    ':iva' => $iva_item,
+                                    ':ice' => $item['ice'] ?? 0,
+                                    ':irbpnr' => $item['irbpnr'] ?? 0
+                                ]);
+                            }
+                        }
+                        
+                        // Actualizar el secuencial en la empresa
+                        $sql = "UPDATE empresas SET ultimo_secuencial = :secuencial WHERE id = :id";
+                        $stmt = $pdo->prepare($sql);
+                        $stmt->execute([':secuencial' => $secuencial, ':id' => $empresa_seleccionada['id']]);
+                        
+                        // Commit de la transacción
+                        $pdo->commit();
+                        
+                        $_SESSION['mensaje_exito'] = 'Factura generada correctamente con clave de acceso: ' . $clave_acceso;
+                        header('Location: ver_factura.php?id=' . $factura_id);
+                        exit;
+                        
+                    } catch (PDOException $e) {
+                        if ($pdo->inTransaction()) {
+                            $pdo->rollBack();
+                        }
+                        $mensaje_error = "Error al guardar la factura: " . $e->getMessage();
+                    } catch (Exception $e) {
+                        if ($pdo->inTransaction()) {
+                            $pdo->rollBack();
+                        }
+                        $mensaje_error = $e->getMessage();
+                    }
+                }
+            }
+        
+    
+
+                
+                // Obtener productos
+                try {
+                    $sql_productos = "SELECT id, codigo, descripcion, precio, iva, ice, irbpnr 
+                                    FROM productos 
+                                    WHERE empresa_id = ?";
+                    $stmt_productos = $pdo->prepare($sql_productos);
+                    $stmt_productos->execute([$empresa_seleccionada['id']]);
+                    $productos = $stmt_productos->fetchAll(PDO::FETCH_ASSOC);
+                } catch (PDOException $e) {
+                    $mensaje_error = "Error al obtener productos: " . $e->getMessage();
+                }
             } else {
                 $mensaje_error = 'Empresa no encontrada';
             }
-            }
-            }
-
-
+        }
+    
     
     // Búsqueda de cliente
     if (isset($_POST['buscar_cliente']) && $empresa_seleccionada) {
@@ -178,7 +290,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['empresa_id'])) {
         }
     }
 }
-
 ?>
 
 <!DOCTYPE html>
@@ -425,19 +536,6 @@ input[readonly] {
             color: #155724;
             border: 1px solid #c3e6cb;
         }
-        .empresa-info p strong {
-    color: #333;
-    font-weight: bold;
-    display: inline-block;
-    width: 120px; /* Para alinear los textos */
-}
-
-.empresa-info {
-    background: #f8f9fa;
-    padding: 15px;
-    border-radius: 5px;
-    margin-bottom: 20px;
-}
     </style>
 </head>
 <body>
@@ -475,16 +573,31 @@ input[readonly] {
             <div class="empresa-info">
                 <h2><?= htmlspecialchars($empresa_seleccionada['razon_social']) ?></h2>
                 <p>RUC: <?= htmlspecialchars($empresa_seleccionada['ruc']) ?></p>
-                <p>N° Factura: <?= $numero_factura ?></p>
-                    <!-- Nueva línea para mostrar la clave de acceso -->
-    <?php if (!empty($claveAcceso)): ?>
-        <p><strong>Clave de Acceso:</strong> <?= $claveAcceso ?></p>
-    <?php endif; ?>
-            </div>
+                <p>N° Factura: <span id="numero_factura_texto"><?= $numero_factura ?></span></p>
+    <p>Clave de Acceso: <span id="clave_acceso_texto"><?= $clave_acceso ?></span></p>
+</div>
             
             <!-- Formulario de facturación -->
             <form method="POST" id="facturaForm">
-                <input type="hidden" name="empresa_id" value="<?= $empresa_seleccionada['id'] ?>">
+    <input type="hidden" name="empresa_id" value="<?= $empresa_seleccionada['id'] ?>">
+    <input type="hidden" id="clave_acceso" name="clave_acceso" value="<?= $clave_acceso ?>">
+    
+    <!-- Campo para editar el secuencial -->
+    <div class="form-group">
+        <label for="numero_secuencial">Secuencial:</label>
+        <input type="number" id="numero_secuencial" name="numero_secuencial" 
+               min="1" value="<?= $secuencial ?>" 
+               onchange="actualizarDatosFactura()">
+    </div>
+
+<div class="form-group">
+    <label for="tipo_comprobante">Tipo de Comprobante:</label>
+    <select id="tipo_comprobante" name="tipo_comprobante" required onchange="actualizarClaveAcceso()">
+        <option value="01">Factura</option>
+        <option value="04">Nota de Crédito</option>
+        <option value="05">Nota de Débito</option>
+    </select>
+</div>
                 
                 <!-- Sección de datos del comprador -->
                 <div class="datos-comprador">
@@ -566,20 +679,19 @@ input[readonly] {
 
 <!-- Resto del formulario (fecha, tipo de comprobante, etc.) -->
 <div class="form-group">
-    <label for="fecha_emision">Fecha de Emisión:</label>
-    <input type="date" id="fecha_emision" name="fecha_emision" required value="<?= date('Y-m-d') ?>">
-</div>
-
-<div class="form-group">
-    <label for="tipo_comprobante">Tipo de Comprobante:</label>
-    <select id="tipo_comprobante" name="tipo_comprobante" required>
-        <option value="01">Factura</option>
-        <option value="04">Nota de Crédito</option>
-        <option value="05">Nota de Débito</option>
-        <option value="06">Guía de Remisión</option>
-        <option value="07">Comprobante de Retención</option>
-    </select>
-</div>
+        <label for="fecha_emision">Fecha de Emisión:</label>
+        <input type="date" id="fecha_emision" name="fecha_emision" required 
+               value="<?= date('Y-m-d') ?>" onchange="actualizarDatosFactura()">
+    </div>
+    
+    <div class="form-group">
+        <label for="tipo_comprobante">Tipo de Comprobante:</label>
+        <select id="tipo_comprobante" name="tipo_comprobante" required onchange="actualizarDatosFactura()">
+            <option value="01">Factura</option>
+            <option value="04">Nota de Crédito</option>
+            <option value="05">Nota de Débito</option>
+        </select>
+    </div>
 
                 <h3>Detalle de la Factura</h3>
 
@@ -615,10 +727,8 @@ input[readonly] {
                 </div>
 
                 <div style="margin-top: 20px;">
-                    <button type="submit" class="btn">Generar Factura</button>
-                    <a href="menu_principal.php" class="btn btn-secondary">Cancelar</a>
-                </div>
-            </form>
+                <button type="submit" name="generar_factura" class="btn">Generar Factura</button>
+                </form>
             <div class="form-group">
     <label for="moneda">Moneda:</label>
     <select id="moneda" name="moneda" required>
@@ -714,6 +824,63 @@ input[readonly] {
     </div>
 </div>
 <script>
+    function actualizarDatosFactura() {
+    const empresa = {
+        codigo_establecimiento: '<?= $empresa_seleccionada["codigo_establecimiento"] ?>',
+        codigo_punto_emision: '<?= $empresa_seleccionada["codigo_punto_emision"] ?>',
+        ruc: '<?= $empresa_seleccionada["ruc"] ?>',
+        tipo_ambiente: '<?= $empresa_seleccionada["tipo_ambiente"] ?>'
+    };
+    
+    const secuencial = document.getElementById('numero_secuencial').value;
+    const fechaEmision = document.getElementById('fecha_emision').value;
+    const tipoComprobante = document.getElementById('tipo_comprobante').value;
+    
+    // Actualizar número de factura visible (formato 001-001-000000123)
+    const numeroFactura = 
+        empresa.codigo_establecimiento.padStart(3, '0') + '-' +
+        empresa.codigo_punto_emision.padStart(3, '0') + '-' +
+        secuencial.padStart(9, '0');
+    
+    document.getElementById('numero_factura_texto').textContent = numeroFactura;
+    
+    // Generar clave de acceso (versión simplificada en JavaScript)
+    const fechaFormateada = fechaEmision.split('-').reverse().join(''); // DDMMAAAA
+    const ambiente = empresa.tipo_ambiente === 'PRODUCCION' ? '2' : '1';
+    const serie = empresa.codigo_establecimiento + empresa.codigo_punto_emision;
+    const secuencialFormateado = secuencial.padStart(9, '0');
+    
+    // Parte fija (esto es una simplificación)
+    const codigoNumerico = '12345678';
+    const tipoEmision = '1';
+    
+    // Construir clave sin dígito verificador
+    const claveSinDV = fechaFormateada + tipoComprobante + empresa.ruc + ambiente + 
+                      serie + secuencialFormateado + codigoNumerico + tipoEmision;
+    
+    // Calcular dígito verificador (versión simplificada)
+    const factores = [7,6,5,4,3,2,7,6,5,4,3,2,7,6,5,4,3,2,7,6,5,4,3,2,7,6,5,4,3,2,7,6,5,4,3,2,7,6,5,4,3,2];
+    let suma = 0;
+    
+    for (let i = 0; i < claveSinDV.length; i++) {
+        suma += parseInt(claveSinDV[i]) * factores[i];
+    }
+    
+    let digito = 11 - (suma % 11);
+    if (digito === 11) digito = 0;
+    if (digito === 10) digito = 1;
+    
+    const claveAcceso = claveSinDV + digito;
+    
+    // Actualizar en la vista y en el campo oculto
+    document.getElementById('clave_acceso_texto').textContent = claveAcceso;
+    document.getElementById('clave_acceso').value = claveAcceso;
+}
+
+// Inicializar al cargar la página
+document.addEventListener('DOMContentLoaded', function() {
+    actualizarDatosFactura();
+});
 // Variables globales
 let productos = <?= json_encode($productos, JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
 let items = [];
@@ -984,7 +1151,83 @@ function removeDatoAdicional(button) {
         button.parentElement.remove();
     }
 }
+// Función para actualizar la clave de acceso
+function actualizarClaveAcceso() {
+    const empresaSeleccionada = <?= $empresa_seleccionada ? json_encode($empresa_seleccionada) : 'null' ?>;
+    if (!empresaSeleccionada) return;
+    
+    // Obtener valores del formulario
+    const fechaEmision = document.getElementById('fecha_emision').value;
+    const tipoComprobante = document.getElementById('tipo_comprobante').value;
+    const numeroSecuencial = document.getElementById('numero_secuencial').value;
+    
+    // Construir serie (establecimiento + punto emisión)
+    const serie = empresaSeleccionada.codigo_establecimiento + empresaSeleccionada.codigo_punto_emision;
+    
+    // Generar número de factura visible (formato 001-002-000000123)
+    const numeroFactura = `${empresaSeleccionada.codigo_establecimiento.padStart(3, '0')}-${empresaSeleccionada.codigo_punto_emision.padStart(3, '0')}-${numeroSecuencial.padStart(9, '0')}`;
+    
+    // Actualizar el número de factura visible
+    const infoFactura = document.querySelector('.empresa-info p:nth-child(3)');
+    if (infoFactura) {
+        infoFactura.textContent = `N° Factura: ${numeroFactura}`;
+    }
+    
+    // Generar la clave de acceso (llamando a una función PHP desde JavaScript)
+    const claveAcceso = generarClaveAccesoPHP(
+        fechaEmision, 
+        tipoComprobante, 
+        empresaSeleccionada.ruc,
+        empresaSeleccionada.tipo_ambiente === 'PRODUCCION' ? '2' : '1',
+        serie,
+        numeroSecuencial
+    );
+    
+    // Actualizar el campo oculto
+    document.getElementById('clave_acceso').value = claveAcceso;
+    
+    console.log('Clave de acceso generada:', claveAcceso);
+}
+
+// Esta función simula la generación de la clave de acceso que haría PHP
+// En realidad deberías pre-generarla en PHP o implementar el algoritmo completo en JS
+function generarClaveAccesoPHP(fecha, tipoComp, ruc, ambiente, serie, secuencial) {
+    // Esta es una implementación simplificada del algoritmo en JavaScript
+    // En producción, deberías usar el mismo algoritmo que en PHP
+    
+    // Formatear fecha DDMMAAAA
+    const fechaObj = new Date(fecha);
+    const dia = String(fechaObj.getDate()).padStart(2, '0');
+    const mes = String(fechaObj.getMonth() + 1).padStart(2, '0');
+    const año = fechaObj.getFullYear();
+    const fechaFormateada = dia + mes + año;
+    
+    // Construir clave sin dígito verificador
+    const claveSinDV = fechaFormateada + tipoComp + ruc + ambiente + serie + String(secuencial).padStart(9, '0') + '12345678' + '1';
+    
+    // Calcular dígito verificador (implementación simplificada)
+    const factores = [7, 6, 5, 4, 3, 2, 7, 6, 5, 4, 3, 2, 7, 6, 5, 4, 3, 2, 7, 6, 5, 4, 3, 2, 7, 6, 5, 4, 3, 2, 7, 6, 5, 4, 3, 2, 7, 6, 5, 4, 3, 2];
+    let suma = 0;
+    
+    for (let i = 0; i < claveSinDV.length; i++) {
+        suma += parseInt(claveSinDV[i]) * factores[i];
+    }
+    
+    let modulo = suma % 11;
+    let digito = 11 - modulo;
+    
+    if (digito == 11) digito = 0;
+    if (digito == 10) digito = 1;
+    
+    return claveSinDV + digito;
+}
+
+// Inicializar al cargar la página
+document.addEventListener('DOMContentLoaded', function() {
+    actualizarClaveAcceso();
+});
 
 </script>
+
 </body>
 </html>
