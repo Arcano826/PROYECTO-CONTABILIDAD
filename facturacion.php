@@ -536,6 +536,19 @@ input[readonly] {
             color: #155724;
             border: 1px solid #c3e6cb;
         }
+        .empresa-info p strong {
+    color: #333;
+    font-weight: bold;
+    display: inline-block;
+    width: 120px; /* Para alinear los textos */
+}
+
+.empresa-info {
+    background: #f8f9fa;
+    padding: 15px;
+    border-radius: 5px;
+    margin-bottom: 20px;
+}
     </style>
 </head>
 <body>

@@ -1,0 +1,383 @@
+/* Solo ajusté los espacios entre elementos, manteniendo TODO lo demás igual */
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    margin: 0;
+    padding: 0;
+    background: url('../images/fondo_factura.jpg') no-repeat center center fixed;
+    background-size: cover;
+    color: var(--text-color);
+    line-height: 1.5;
+    min-height: 100vh;
+}
+
+.container {
+    max-width: 1200px;
+    margin: 20px auto;
+    background: #fff;
+    padding: 25px;
+    border-radius: 8px;
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+}
+
+/* SOLO CAMBIÉ ESTOS MÁRGENES PARA MEJORAR ESPACIADO */
+h1, h2, h3 {
+    color: #2c3e50;
+    margin-top: 0;
+    margin-bottom: 1.2em; /* Aumenté este valor */
+}
+
+h1 {
+    border-bottom: 2px solid #3498db;
+    padding-bottom: 10px;
+    margin-bottom: 25px; /* Aumenté este valor */
+    font-size: 28px;
+}
+
+h2 {
+    font-size: 22px;
+    margin: 30px 0 20px; /* Aumenté estos valores */
+    color: #2980b9;
+}
+
+h3 {
+    font-size: 18px;
+    color: #16a085;
+    margin-bottom: 1.5em; /* Aumenté este valor */
+}
+
+/* Ajusté solo los márgenes verticales */
+.form-group {
+    margin-bottom: 1.5em; /* Aumenté este valor */
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+/* Secciones con más espacio debajo */
+.empresa-selector,
+.empresa-info, 
+.datos-comprador {
+    margin-bottom: 30px; /* Aumenté este valor */
+}
+
+/* Mantengo TODO lo demás exactamente igual */
+.alert {
+    padding: 12px 15px;
+    margin-bottom: 20px;
+    border-radius: 4px;
+    border-left: 4px solid transparent;
+}
+
+.alert-danger {
+    background-color: #f8d7da;
+    color: #721c24;
+    border-color: #f5c6cb;
+}
+
+.alert-info {
+    background-color: #d1ecf1;
+    color: #0c5460;
+    border-color: #bee5eb;
+}
+
+.alert-success {
+    background-color: #d4edda;
+    color: #155724;
+    border-color: #c3e6cb;
+}
+
+label {
+    width: 200px;
+    font-weight: 600;
+    margin-right: 15px;
+    color: #34495e;
+}
+
+input[type="text"],
+input[type="number"],
+input[type="date"],
+input[type="email"],
+input[type="password"],
+select,
+textarea {
+    flex: 1;
+    min-width: 200px;
+    padding: 10px 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+    transition: border-color 0.3s;
+}
+
+input[type="text"]:focus,
+input[type="number"]:focus,
+input[type="date"]:focus,
+input[type="email"]:focus,
+textarea:focus,
+select:focus {
+    border-color: #3498db;
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
+}
+
+input[readonly] {
+    background-color: #f5f5f5;
+    cursor: not-allowed;
+}
+
+.empresa-selector {
+    background: #f8f9fa;
+    padding: 20px;
+    border-radius: 8px;
+    border: 1px solid #e1e5eb;
+}
+
+.empresa-selector select {
+    width: 100%;
+    max-width: 600px;
+    padding: 10px;
+    font-size: 15px;
+}
+
+.empresa-info {
+    background: #e8f4fc;
+    padding: 20px;
+    border-radius: 8px;
+    border-left: 4px solid #3498db;
+}
+
+.empresa-info p {
+    margin: 5px 0;
+}
+
+.empresa-info p strong {
+    display: inline-block;
+    width: 150px;
+    color: #2c3e50;
+}
+
+.datos-comprador {
+    background: #f8f9fa;
+    padding: 20px;
+    border-radius: 8px;
+    border: 1px solid #e1e5eb;
+}
+
+.comprador-tipo-container {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    flex-wrap: wrap;
+}
+
+.tipo-comprador {
+    flex: 1;
+    min-width: 200px;
+}
+
+.comprador-warning small {
+    color: #e74c3c;
+    font-style: italic;
+    font-size: 13px;
+}
+
+.busqueda-container {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-bottom: 1.5em; /* Aumenté este valor */
+}
+
+.busqueda-container input {
+    flex: 1;
+    min-width: 200px;
+}
+
+.items-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 20px 0;
+    font-size: 14px;
+}
+
+.items-table th {
+    background-color: #3498db;
+    color: white;
+    padding: 12px;
+    text-align: left;
+}
+
+.items-table td {
+    padding: 10px;
+    border: 1px solid #ddd;
+}
+
+.items-table input[type="number"] {
+    width: 80px;
+    padding: 6px;
+}
+
+.total-section {
+    background: #f8f9fa;
+    padding: 15px;
+    border-radius: 8px;
+    margin: 20px 0;
+    text-align: right;
+    font-size: 16px;
+}
+
+.total-section div {
+    margin-bottom: 8px;
+}
+
+.total-section span {
+    font-weight: bold;
+    color: #2c3e50;
+    min-width: 100px;
+    display: inline-block;
+    text-align: right;
+}
+
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 10px 18px;
+    background-color: #3498db;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    text-decoration: none;
+    transition: background-color 0.3s;
+    margin: 5px;
+}
+
+.btn:hover {
+    background-color: #2980b9;
+}
+
+.btn i {
+    margin-right: 5px;
+}
+
+.btn-secondary {
+    background-color: #7f8c8d;
+}
+
+.btn-secondary:hover {
+    background-color: #6c7a7d;
+}
+
+.btn-danger {
+    background-color: #e74c3c;
+}
+
+.btn-danger:hover {
+    background-color: #c0392b;
+}
+
+.btn-small {
+    padding: 8px 12px;
+    font-size: 13px;
+}
+
+.btn-small i {
+    margin-right: 0;
+}
+
+#productModal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 1000;
+    justify-content: center;
+    align-items: center;
+}
+
+.modal-content {
+    background-color: white;
+    padding: 25px;
+    border-radius: 8px;
+    width: 90%;
+    max-width: 900px;
+    max-height: 80vh;
+    overflow-y: auto;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+}
+
+.forma-pago, .dato-adicional {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    margin-bottom: 10px;
+    padding: 10px;
+    background: #f8f9fa;
+    border-radius: 4px;
+    flex-wrap: wrap;
+}
+
+.forma-pago select, .forma-pago input,
+.dato-adicional input, .dato-adicional textarea {
+    flex: 1;
+    min-width: 120px;
+}
+
+.dato-adicional textarea {
+    min-height: 60px;
+}
+
+@media (max-width: 768px) {
+    .container {
+        padding: 15px;
+    }
+    
+    label {
+        width: 100%;
+        margin-bottom: 5px;
+    }
+    
+    input[type="text"],
+    input[type="number"],
+    input[type="date"],
+    select,
+    textarea {
+        width: 100%;
+    }
+    
+    .comprador-tipo-container,
+    .busqueda-container,
+    .forma-pago,
+    .dato-adicional {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .modal-content {
+        width: 95%;
+        padding: 15px;
+    }
+}
+
+@media (max-width: 480px) {
+    .btn {
+        width: 100%;
+        margin: 5px 0;
+    }
+    
+    .items-table {
+        font-size: 13px;
+    }
+    
+    .items-table th, 
+    .items-table td {
+        padding: 6px;
+    }
+}
