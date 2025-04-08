@@ -3,7 +3,7 @@ session_start();
 require_once './php/config.php';
 
 if (!isset($_SESSION['usuario_id'])) {
-    header('Location: ../index.php');
+    header('Location: ../index.php?error=no_autenticado');
     exit;
 }
 
@@ -11,6 +11,16 @@ if (!isset($_SESSION['usuario_id'])) {
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
         $pdo = conectarDB();
+
+// Verificación robusta del usuario
+$stmt = $pdo->prepare("SELECT 1 FROM usuarios WHERE id = ? LIMIT 1");
+$stmt->execute([$_SESSION['usuario_id']]);
+if (!$stmt->fetch()) {
+    error_log("Intento de acceso con usuario inválido ID: ".$_SESSION['usuario_id']);
+    session_destroy();
+    header('Location: ../index.php?error=usuario_no_existe');
+    exit;
+}
         
         // Inicializar array de datos con valores por defecto
         $datos = [
@@ -110,7 +120,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         
     } catch (Exception $e) {
         $_SESSION['error_message'] = $e->getMessage();
-        error_log('Error en nueva_empresa.php: ' . $e->getMessage());
+        error_log(message: 'Error en nueva_empresa.php: ' . $e->getMessage());
     }
 }
 ?>

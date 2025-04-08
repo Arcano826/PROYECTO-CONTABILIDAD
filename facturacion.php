@@ -9,6 +9,7 @@ if (!isset($_SESSION['usuario_id'])) {
 }
 
 require_once './php/config.php';
+require_once './php/funciones.php'; // Asegúrate de que la ruta sea correcta
 
 // Inicializar variables
 $empresa_seleccionada = null;
@@ -16,12 +17,15 @@ $numero_factura = '';
 $productos = [];
 $mensaje_error = '';
 $mensaje_info = '';
+$clave_acceso = ''; // Inicializar variable clave_acceso
+$secuencial = 0; // Inicializar variable secuencial
 
 // Obtener empresas del usuario
 try {
     $pdo = conectarDB();
     $sql_empresas = "SELECT id, ruc, razon_social, nombre_comercial, 
-                    codigo_establecimiento, codigo_punto_emision, ultimo_secuencial
+                    codigo_establecimiento, codigo_punto_emision, ultimo_secuencial,
+                    tipo_ambiente
                     FROM empresas 
                     WHERE usuario_id = ?
                     ORDER BY razon_social";
@@ -49,9 +53,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             
             if (!$empresa_seleccionada) {
                 $mensaje_error = 'Empresa no encontrada';
-                // Continuar con el flujo normal para mostrar el error
             } else {
-                // Procesamiento de productos (manteniendo tu lógica original)
+                // Establecer valor por defecto si no existe
+                if (!isset($empresa_seleccionada['tipo_ambiente'])) {
+                    $empresa_seleccionada['tipo_ambiente'] = 'PRUEBAS';
+                }
+                
+                // Obtener productos
                 try {
                     $sql_productos = "SELECT id, codigo, descripcion, precio, iva, ice, irbpnr 
                                     FROM productos 
@@ -78,10 +86,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             $empresa_seleccionada['codigo_punto_emision'], 
                             $secuencial);
                         
-                        // Generar clave de acceso inicial
+                        // Generar clave de acceso
                         $clave_acceso = generarClaveAcceso(
-                            date('Y-m-d'),
-                            '01', // Tipo comprobante por defecto (Factura)
+                            $_POST['fecha_emision'],
+                            $_POST['tipo_comprobante'],
                             $empresa_seleccionada['ruc'],
                             $empresa_seleccionada['tipo_ambiente'] == 'PRODUCCION' ? '2' : '1',
                             $empresa_seleccionada['codigo_establecimiento'] . $empresa_seleccionada['codigo_punto_emision'],
@@ -218,17 +226,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         }
                         $mensaje_error = "Error al guardar la factura: " . $e->getMessage();
                     } catch (Exception $e) {
-                        if ($pdo->inTransaction()) {
-                            $pdo->rollBack();
-                        }
                         $mensaje_error = $e->getMessage();
                     }
                 }
             }
-        
-    
 
-                
                 // Obtener productos
                 try {
                     $sql_productos = "SELECT id, codigo, descripcion, precio, iva, ice, irbpnr 
@@ -299,257 +301,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sistema de Facturación</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    <style>
-        body { 
-            font-family: Arial, sans-serif; 
-            background-color: #f5f5f5;
-            margin: 0;
-            padding: 20px;
-        }
-        .container { 
-            max-width: 1000px; 
-            margin: 0 auto; 
-            background-color: white;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-            padding: 25px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-        }
-        h1, h2 {
-            color: #333;
-            border-bottom: 1px solid #eee;
-            padding-bottom: 10px;
-        }
-        .header-info {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 20px;
-        }
-        .company-logo {
-            max-height: 80px;
-        }
-        .form-group { 
-            margin-bottom: 15px;
-            display: flex;
-            flex-wrap: wrap;
-            align-items: center;
-        }
-        label { 
-            width: 200px;
-            font-weight: bold;
-            margin-right: 10px;
-        }
-        input[type="text"], 
-        input[type="number"],
-        input[type="date"],
-        select,
-        textarea {
-            flex: 1;
-            padding: 8px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            min-width: 200px;
-        }
-        .items-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin: 20px 0;
-        }
-        .items-table th, .items-table td {
-            border: 1px solid #ddd;
-            padding: 8px;
-            text-align: left;
-        }
-        .items-table th {
-            background-color: #f2f2f2;
-        }
-        .btn {
-            padding: 8px 15px;
-            background-color: #4CAF50;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            text-decoration: none;
-            display: inline-block;
-            margin: 5px;
-        }
-        .btn:hover {
-            background-color: #45a049;
-        }
-        .btn-secondary {
-            background-color: #6c757d;
-        }
-        .btn-secondary:hover {
-            background-color: #5a6268;
-        }
-        .btn-danger {
-            background-color: #dc3545;
-        }
-        .btn-danger:hover {
-            background-color: #c82333;
-        }
-        .total-section {
-            text-align: right;
-            margin-top: 20px;
-            font-size: 1.2em;
-            font-weight: bold;
-        }
-        .empresa-selector {
-            background: #f8f9fa;
-            padding: 20px;
-            border-radius: 10px;
-            margin-bottom: 20px;
-            border: 1px solid #ddd;
-        }
-        .empresa-selector select {
-            padding: 10px;
-            width: 100%;
-            max-width: 500px;
-            border-radius: 5px;
-            border: 1px solid #ddd;
-            background-color: #fff;
-            color: #333;
-        }
-        .empresa-info {
-            background: #e9ecef;
-            padding: 15px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-            border: 1px solid #ddd;
-        }
-        #productModal {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0,0,0,0.5);
-            z-index: 1000;
-            justify-content: center;
-            align-items: center;
-        }
-        .modal-content {
-            background-color: white;
-            padding: 20px;
-            border-radius: 5px;
-            width: 80%;
-            max-width: 800px;
-            max-height: 80vh;
-            overflow-y: auto;
-        }
-        @media (max-width: 768px) {
-            label {
-                width: 100%;
-                margin-bottom: 5px;
-            }
-            input[type="text"], 
-            input[type="number"],
-            input[type="date"],
-            select,
-            textarea {
-                width: 100%;
-            }
-            .header-info {
-                flex-direction: column;
-            }
-        }
-        .datos-comprador {
-    background: #f8f9fa;
-    padding: 20px;
-    border-radius: 8px;
-    margin-bottom: 20px;
-    border: 1px solid #ddd;
-}
+    <link rel="stylesheet" href="./css/style_facturacion.css">
 
-.datos-comprador h3 {
-    margin-top: 0;
-    color: #333;
-    border-bottom: 1px solid #eee;
-    padding-bottom: 10px;
-    text-transform: uppercase;
-    font-size: 1.1em;
-}
-
-.comprador-tipo-container {
-    display: flex;
-    align-items: center;
-    gap: 15px;
-}
-
-.tipo-comprador {
-    flex: 1;
-    padding: 8px;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    text-transform: uppercase;
-    font-weight: bold;
-}
-
-.comprador-warning small {
-    color: #dc3545;
-    font-style: italic;
-}
-
-.busqueda-container {
-    display: flex;
-    gap: 5px;
-}
-
-.busqueda-container input {
-    flex: 1;
-}
-
-.btn-small {
-    padding: 8px 12px;
-    font-size: 0.9em;
-}
-
-.btn-small i {
-    margin-right: 0;
-}
-
-/* Estilo para campos de solo lectura */
-input[readonly] {
-    background-color: #f5f5f5;
-    border: 1px solid #ddd;
-    cursor: not-allowed;
-}
-        .alert {
-            padding: 10px;
-            margin-bottom: 15px;
-            border-radius: 4px;
-        }
-        .alert-danger {
-            background-color: #f8d7da;
-            color: #721c24;
-            border: 1px solid #f5c6cb;
-        }
-        .alert-info {
-            background-color: #d1ecf1;
-            color: #0c5460;
-            border: 1px solid #bee5eb;
-        }
-        .alert-success {
-            background-color: #d4edda;
-            color: #155724;
-            border: 1px solid #c3e6cb;
-        }
-        .empresa-info p strong {
-    color: #333;
-    font-weight: bold;
-    display: inline-block;
-    width: 120px; /* Para alinear los textos */
-}
-
-.empresa-info {
-    background: #f8f9fa;
-    padding: 15px;
-    border-radius: 5px;
-    margin-bottom: 20px;
-}
-    </style>
 </head>
 <body>
     <div class="container">
