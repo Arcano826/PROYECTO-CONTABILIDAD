@@ -6,9 +6,9 @@
 // =============================================
 define('DB_HOST', '127.0.0.1'); // O la IP de tu servidor MySQL
 define('DB_USER', 'root'); // Usuario de MySQL Workbench
-define('DB_PASS', '12345'); // Contraseña del usuario
+define('DB_PASS', '1234'); // Contraseña del usuario
 define('DB_NAME', 'sistema_facturacion'); // Nombre de tu base de datos
-define('DB_PORT', 3310); // Puerto de MySQL (por defecto 3306)
+define('DB_PORT', 3306); // Puerto de MySQL (por defecto 3306)
 
 // =============================================
 // CONFIGURACIÓN PARA TCPDF (GENERACIÓN DE PDF)

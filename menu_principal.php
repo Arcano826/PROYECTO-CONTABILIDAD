@@ -242,7 +242,7 @@ try {
 </div>
 
 <div class="empresas-container">
-    <h3>Mis Empresas</h3> <!-- Cambiado de "Empresas Registradas" a "Mis Empresas" -->
+    <h3>Empresas</h3> <!-- Cambiado de "Empresas Registradas" a "Mis Empresas" -->
     <?php if(empty($empresas)): ?>
         <p>No tienes empresas registradas.</p> <!-- Mensaje más personalizado -->
     <?php else: ?>
